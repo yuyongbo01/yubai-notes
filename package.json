@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "prebuild": "node --experimental-strip-types scripts/generate-rss.mjs",
     "build": "vinext build",
+    "postbuild": "node scripts/prepare-static-hosting.mjs",
     "start": "vinext start",
     "lint": "oxlint",
     "format": "oxfmt"
