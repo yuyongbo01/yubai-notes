@@ -71,7 +71,8 @@ jobs:
           printf '%s\n' "$PAGES_DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 0600 ~/.ssh/id_ed25519
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
-          git clone --depth 1 git@github.com:yuyongbo01/yuyongbo01.github.io.git /tmp/pages-deploy
+          git -c core.sshCommand="ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes" \
+            clone --depth 1 git@github.com:yuyongbo01/yuyongbo01.github.io.git /tmp/pages-deploy
           git -C /tmp/pages-deploy rm -rf .
           cp -a dist/client/. /tmp/pages-deploy/
           git -C /tmp/pages-deploy add -A
