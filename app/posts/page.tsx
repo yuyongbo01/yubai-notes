@@ -11,11 +11,9 @@ export const metadata: Metadata = {
   alternates: { canonical: '/posts' },
 };
 
-type PageProps = { searchParams: Promise<{ tag?: string }> };
+export const dynamic = 'force-static';
 
-export default async function PostsPage({ searchParams }: PageProps) {
-  const { tag } = await searchParams;
-  const initialTag = typeof tag === 'string' && posts.some((post) => post.tags.includes(tag)) ? tag : '全部';
+export default function PostsPage() {
   return (
     <main className="min-h-screen bg-background">
       <PublicHeader />
@@ -27,7 +25,7 @@ export default async function PostsPage({ searchParams }: PageProps) {
         </div>
       </section>
       <section className="mx-auto max-w-[1100px] px-5 py-10 md:px-8 md:py-14">
-        <PostsExplorer key={initialTag} posts={posts} initialTag={initialTag} />
+        <PostsExplorer posts={posts} />
       </section>
       <PublicFooter />
     </main>

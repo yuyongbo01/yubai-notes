@@ -45,7 +45,9 @@ jobs:
             if curl -fsS http://127.0.0.1:3000/ >/dev/null && \
                curl -fsS http://127.0.0.1:3000/about.html >/dev/null && \
                curl -fsS http://127.0.0.1:3000/posts.html >/dev/null && \
-               curl -fsS http://127.0.0.1:3000/posts/notes-are-a-conversation.html >/dev/null; then
+               curl -fsS http://127.0.0.1:3000/posts/notes-are-a-conversation.html >/dev/null && \
+               curl -fsS http://127.0.0.1:3000/studio/posts/new.html >/dev/null && \
+               curl -fsS http://127.0.0.1:3000/rss.xml >/dev/null; then
               exit 0
             fi
             sleep 1

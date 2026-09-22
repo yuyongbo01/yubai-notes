@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Clock3, Search, X } from 'lucide-react';
 
@@ -13,6 +13,12 @@ export function PostsExplorer({ posts, initialTag = '全部' }: { posts: DemoPos
   const [tag, setTag] = useState(initialTag);
 
   const tags = ['全部', ...Array.from(new Set(posts.flatMap((post) => post.tags)))];
+  useEffect(() => {
+    const requestedTag = new URLSearchParams(window.location.search).get('tag');
+    const availableTags = new Set(posts.flatMap((post) => post.tags));
+    if (requestedTag && availableTags.has(requestedTag)) setTag(requestedTag);
+  }, [posts]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return posts.filter((post) => {

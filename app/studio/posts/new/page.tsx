@@ -1,8 +1,7 @@
 import { PostEditor } from '@/components/post-editor';
 
-type PageProps = { searchParams: Promise<{ draft?: string }> };
+export const dynamic = 'force-static';
 
-export default async function NewPostPage({ searchParams }: PageProps) {
-  const { draft } = await searchParams;
-  return <PostEditor mode="new" draftId={draft} />;
+export default function NewPostPage() {
+  return <PostEditor mode="new" />;
 }
