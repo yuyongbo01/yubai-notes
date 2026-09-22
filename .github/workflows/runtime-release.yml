@@ -62,6 +62,28 @@ jobs:
           cd /tmp
           sha256sum yubai-notes-static.tar.gz > SHA256SUMS
 
+      - name: Publish GitHub Pages
+        shell: bash
+        env:
+          PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: |
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "$PAGES_DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+          git clone --depth 1 git@github.com:yuyongbo01/yuyongbo01.github.io.git /tmp/pages-deploy
+          git -C /tmp/pages-deploy rm -rf .
+          cp -a dist/client/. /tmp/pages-deploy/
+          git -C /tmp/pages-deploy add -A
+          if git -C /tmp/pages-deploy diff --cached --quiet; then
+            echo "GitHub Pages is already current."
+          else
+            git -C /tmp/pages-deploy -c user.name=github-actions \
+              -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+              commit -m "Publish site from ${GITHUB_SHA}"
+            git -C /tmp/pages-deploy push origin main
+          fi
+
       - name: Publish lightweight static branch
         shell: bash
         run: |
