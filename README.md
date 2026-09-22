@@ -2,7 +2,7 @@
 
 “余白手记”个人博客源码。项目使用 React 19、TypeScript、Tailwind CSS、Vinext 和 Vite 构建，生产环境由 Nginx 直接提供纯静态页面。
 
-服务器不再负责编译，也不需要运行 Node.js：推送到 `main` 后，GitHub Actions 会生成经过访问测试和 SHA-256 校验的静态站点包。服务器只下载几 MB 的 HTML、CSS、JavaScript 和图片，适合 1GB 内存的小型服务器。
+服务器不再负责编译，也不需要运行 Node.js：推送到 `main` 后，GitHub Actions 会生成经过访问测试和 SHA-256 校验的静态站点包。服务器只通过 Git 拉取几 MB 的 HTML、CSS、JavaScript 和图片，适合 1GB 内存的小型服务器。
 
 > `/studio` 当前是交互演示界面，不是带数据库和真实鉴权的生产 CMS；演示登录信息不能用于保护真实内容。
 
@@ -24,7 +24,7 @@ NEXT_PUBLIC_SITE_URL=https://你的域名 npm run build
 
 ## Ubuntu/Debian 一键部署
 
-下面的命令会自动安装缺少的 Nginx，下载 GitHub 已构建的静态包、校验文件并发布到 80 端口。服务器不会执行 `npm install`、构建或运行 Node.js：
+下面的命令会自动安装缺少的 Nginx，通过 Git 获取 GitHub 已构建的静态包、校验文件并发布到 80 端口。服务器不会执行 `npm install`、构建或运行 Node.js：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yuyongbo01/yubai-notes/main/scripts/deploy-ubuntu.sh | sudo bash

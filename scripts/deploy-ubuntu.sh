@@ -2,12 +2,12 @@
 set -Eeuo pipefail
 
 # Lightweight static deployment for Ubuntu/Debian. GitHub Actions builds the
-# site; the server only downloads, verifies and serves it with Nginx.
+# site; the server only fetches, verifies and serves it with Nginx.
 APP_NAME="${APP_NAME:-yubai-notes}"
 DOMAIN="${DOMAIN:-_}"
 EMAIL="${EMAIL:-}"
-BUNDLE_URL="${BUNDLE_URL:-https://raw.githubusercontent.com/yuyongbo01/yubai-notes/runtime-static/yubai-notes-static.tar.gz}"
-CHECKSUM_URL="${CHECKSUM_URL:-https://raw.githubusercontent.com/yuyongbo01/yubai-notes/runtime-static/SHA256SUMS}"
+BUNDLE_REPO="${BUNDLE_REPO:-https://github.com/yuyongbo01/yubai-notes.git}"
+BUNDLE_BRANCH="${BUNDLE_BRANCH:-runtime-static}"
 RELEASES_DIR="/var/www/${APP_NAME}-releases"
 CURRENT_LINK="/var/www/${APP_NAME}-current"
 NGINX_SITE="/etc/nginx/sites-available/${APP_NAME}"
@@ -44,6 +44,7 @@ fi
 
 MISSING_PACKAGES=()
 command -v curl >/dev/null 2>&1 || MISSING_PACKAGES+=(curl)
+command -v git >/dev/null 2>&1 || MISSING_PACKAGES+=(git)
 command -v nginx >/dev/null 2>&1 || MISSING_PACKAGES+=(nginx)
 command -v sha256sum >/dev/null 2>&1 || MISSING_PACKAGES+=(coreutils)
 command -v tar >/dev/null 2>&1 || MISSING_PACKAGES+=(tar)
@@ -54,18 +55,16 @@ if (( ${#MISSING_PACKAGES[@]} > 0 )); then
 fi
 
 TEMP_DIR="$(mktemp -d "/tmp/${APP_NAME}.XXXXXX")"
-echo "正在下载静态站点包……"
-curl -fL --retry 5 --retry-all-errors --connect-timeout 15 \
-  -o "${TEMP_DIR}/${ARCHIVE_NAME}" "${BUNDLE_URL}"
-curl -fL --retry 5 --retry-all-errors --connect-timeout 15 \
-  -o "${TEMP_DIR}/SHA256SUMS" "${CHECKSUM_URL}"
+echo "正在通过 Git 获取静态站点包……"
+git clone --depth 1 --single-branch --branch "${BUNDLE_BRANCH}" \
+  "${BUNDLE_REPO}" "${TEMP_DIR}/bundle"
 (
-  cd "${TEMP_DIR}"
+  cd "${TEMP_DIR}/bundle"
   sha256sum --check SHA256SUMS
 )
 
 install -d -m 0755 "${RELEASE_DIR}"
-tar -xzf "${TEMP_DIR}/${ARCHIVE_NAME}" -C "${RELEASE_DIR}"
+tar -xzf "${TEMP_DIR}/bundle/${ARCHIVE_NAME}" -C "${RELEASE_DIR}"
 test -f "${RELEASE_DIR}/index.html"
 chown -R www-data:www-data "${RELEASE_DIR}"
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
