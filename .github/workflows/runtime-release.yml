@@ -68,7 +68,7 @@ jobs:
           mkdir /tmp/runtime-static
           cp /tmp/yubai-notes-static.tar.gz /tmp/SHA256SUMS /tmp/runtime-static/
           git switch --orphan runtime-static
-          git rm -rf .
+          git rm -rf --ignore-unmatch .
           cp /tmp/runtime-static/* .
           git add SHA256SUMS yubai-notes-static.tar.gz
           git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
