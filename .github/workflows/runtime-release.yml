@@ -68,7 +68,7 @@ jobs:
           PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
         run: |
           install -d -m 0700 ~/.ssh
-          printf '%s\n' "$PAGES_DEPLOY_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PAGES_DEPLOY_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 0600 ~/.ssh/id_ed25519
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
           git -c core.sshCommand="ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes" \
