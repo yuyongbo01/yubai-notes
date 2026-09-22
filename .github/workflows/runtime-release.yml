@@ -1,0 +1,79 @@
+name: Build runtime release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build application
+        run: npm run build
+        env:
+          SITE_URL: http://localhost:3000
+
+      - name: Keep runtime dependencies only
+        run: npm prune --omit=dev --no-audit --no-fund
+
+      - name: Smoke test production bundle
+        shell: bash
+        run: |
+          SITE_URL=http://127.0.0.1:3000 npm start >/tmp/yubai-notes.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/yubai-notes.log
+          exit 1
+
+      - name: Package runtime bundle
+        shell: bash
+        run: |
+          tar -czf yubai-notes-linux-x64.tar.gz \
+            dist node_modules package.json package-lock.json .openai \
+            app components hooks lib public components.json \
+            next.config.ts tsconfig.json vite.config.ts
+          sha256sum yubai-notes-linux-x64.tar.gz > SHA256SUMS
+
+      - name: Publish rolling release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag --force runtime-latest "$GITHUB_SHA"
+          git push origin refs/tags/runtime-latest --force
+          if gh release view runtime-latest >/dev/null 2>&1; then
+            gh release upload runtime-latest \
+              yubai-notes-linux-x64.tar.gz SHA256SUMS --clobber
+          else
+            gh release create runtime-latest \
+              yubai-notes-linux-x64.tar.gz SHA256SUMS \
+              --title "Latest runtime bundle" \
+              --notes "Automatically built deployment bundle for Ubuntu/Debian servers."
+          fi
