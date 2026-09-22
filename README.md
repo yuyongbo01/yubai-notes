@@ -33,10 +33,12 @@ curl -fsSL https://raw.githubusercontent.com/yuyongbo01/yubai-notes/main/scripts
 部署到已解析到服务器的域名，并自动申请 Let's Encrypt HTTPS 证书：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yuyongbo01/yubai-notes/main/scripts/deploy-ubuntu.sh | sudo env DOMAIN=blog.example.com SITE_URL=https://blog.example.com EMAIL=you@example.com bash
+curl -fsSL https://raw.githubusercontent.com/yuyongbo01/yubai-notes/main/scripts/deploy-ubuntu.sh | sudo env DOMAIN=blog.example.com EMAIL=you@example.com bash
 ```
 
-重复执行同一条命令即可发布新版本。每次部署会创建独立版本目录，并原子切换 `/opt/yubai-notes/current` 软链接；自动保留最近三个版本，失败时不会切换线上版本。
+使用域名时，请同时把 GitHub 仓库 Actions 变量 `SITE_URL` 设置为完整域名（例如 `https://blog.example.com`），再重新运行构建工作流。
+
+重复执行同一条命令即可发布新版本。每次部署会创建独立版本目录，并原子切换 `/var/www/yubai-notes-current` 软链接；自动保留最近三个版本，失败时不会切换线上版本。
 
 如果 GitHub 刚收到新提交，请先等待仓库中的 `Build static release` 工作流完成，再在服务器执行部署命令。
 
