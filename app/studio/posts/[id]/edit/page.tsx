@@ -5,6 +5,12 @@ import { notFound } from 'next/navigation';
 
 type PageProps = { params: Promise<{ id: string }> };
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return studioPosts.map((post) => ({ id: post.id }));
+}
+
 export default async function EditPostPage({ params }: PageProps) {
   const { id } = await params;
   const post = studioPosts.find((item) => item.id === id);

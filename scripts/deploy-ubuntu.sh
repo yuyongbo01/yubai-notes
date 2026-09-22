@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Lightweight deployment for Ubuntu/Debian. GitHub Actions builds the app;
-# the server only downloads, verifies and starts the runtime bundle.
+# Lightweight static deployment for Ubuntu/Debian. GitHub Actions builds the
+# site; the server only downloads, verifies and serves it with Nginx.
 APP_NAME="${APP_NAME:-yubai-notes}"
 DOMAIN="${DOMAIN:-_}"
-SITE_URL="${SITE_URL:-}"
 EMAIL="${EMAIL:-}"
-BUNDLE_URL="${BUNDLE_URL:-https://github.com/yuyongbo01/yubai-notes/releases/download/runtime-latest/yubai-notes-linux-x64.tar.gz}"
-CHECKSUM_URL="${CHECKSUM_URL:-https://github.com/yuyongbo01/yubai-notes/releases/download/runtime-latest/SHA256SUMS}"
-APP_ROOT="/opt/${APP_NAME}"
-RELEASES_DIR="${APP_ROOT}/releases"
-CURRENT_LINK="${APP_ROOT}/current"
+BUNDLE_URL="${BUNDLE_URL:-https://raw.githubusercontent.com/yuyongbo01/yubai-notes/runtime-static/yubai-notes-static.tar.gz}"
+CHECKSUM_URL="${CHECKSUM_URL:-https://raw.githubusercontent.com/yuyongbo01/yubai-notes/runtime-static/SHA256SUMS}"
+RELEASES_DIR="/var/www/${APP_NAME}-releases"
+CURRENT_LINK="/var/www/${APP_NAME}-current"
 NGINX_SITE="/etc/nginx/sites-available/${APP_NAME}"
-SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
-ARCHIVE_NAME="yubai-notes-linux-x64.tar.gz"
+ARCHIVE_NAME="yubai-notes-static.tar.gz"
 RELEASE_ID="$(date -u +%Y%m%d%H%M%S)"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_ID}"
 TEMP_DIR=""
@@ -49,34 +46,15 @@ MISSING_PACKAGES=()
 command -v curl >/dev/null 2>&1 || MISSING_PACKAGES+=(curl)
 command -v nginx >/dev/null 2>&1 || MISSING_PACKAGES+=(nginx)
 command -v sha256sum >/dev/null 2>&1 || MISSING_PACKAGES+=(coreutils)
+command -v tar >/dev/null 2>&1 || MISSING_PACKAGES+=(tar)
 if (( ${#MISSING_PACKAGES[@]} > 0 )); then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get install -y ca-certificates "${MISSING_PACKAGES[@]}"
 fi
 
-NODE_MAJOR=0
-if command -v node >/dev/null 2>&1; then
-  NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]")"
-fi
-if (( NODE_MAJOR < 22 )); then
-  export DEBIAN_FRONTEND=noninteractive
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y nodejs
-fi
-
-if [[ -z "${SITE_URL}" ]]; then
-  if [[ "${DOMAIN}" != "_" ]]; then
-    SITE_URL="http://${DOMAIN}"
-  else
-    SERVER_IP="$(hostname -I | awk '{print $1}')"
-    SITE_URL="http://${SERVER_IP:-localhost}"
-  fi
-fi
-SITE_URL="${SITE_URL%/}"
-
 TEMP_DIR="$(mktemp -d "/tmp/${APP_NAME}.XXXXXX")"
-echo "正在下载预构建发布包……"
+echo "正在下载静态站点包……"
 curl -fL --retry 5 --retry-all-errors --connect-timeout 15 \
   -o "${TEMP_DIR}/${ARCHIVE_NAME}" "${BUNDLE_URL}"
 curl -fL --retry 5 --retry-all-errors --connect-timeout 15 \
@@ -88,8 +66,7 @@ curl -fL --retry 5 --retry-all-errors --connect-timeout 15 \
 
 install -d -m 0755 "${RELEASE_DIR}"
 tar -xzf "${TEMP_DIR}/${ARCHIVE_NAME}" -C "${RELEASE_DIR}"
-test -f "${RELEASE_DIR}/dist/server/index.js"
-test -x "${RELEASE_DIR}/node_modules/.bin/vinext"
+test -f "${RELEASE_DIR}/index.html"
 chown -R www-data:www-data "${RELEASE_DIR}"
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 
@@ -107,54 +84,32 @@ server {
     ${LISTEN_IPV4}
     ${LISTEN_IPV6}
     server_name ${DOMAIN};
+    root ${CURRENT_LINK};
+    index index.html;
+
+    location /_next/static/ {
+        try_files \$uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        try_files \$uri.html \$uri/index.html \$uri =404;
     }
 }
 EOF
 
-cat >"${SERVICE_FILE}" <<EOF
-[Unit]
-Description=Yubai Notes web application
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=${CURRENT_LINK}
-Environment=NODE_ENV=production
-Environment=PORT=3000
-Environment=SITE_URL=${SITE_URL}
-ExecStart=/usr/bin/npm start
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# Remove the old Vinext service if a previous dynamic deployment created it.
+if systemctl list-unit-files "${APP_NAME}.service" --no-legend 2>/dev/null | grep -q "${APP_NAME}.service"; then
+  systemctl disable --now "${APP_NAME}" || true
+fi
+rm -f "/etc/systemd/system/${APP_NAME}.service"
+systemctl daemon-reload
 
 ln -sfn "${NGINX_SITE}" "/etc/nginx/sites-enabled/${APP_NAME}"
 nginx -t
-systemctl daemon-reload
-systemctl enable --now "${APP_NAME}"
-systemctl restart "${APP_NAME}"
 systemctl enable --now nginx
 systemctl reload nginx
-
-for _ in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
-    break
-  fi
-  sleep 1
-done
-curl -fsS http://127.0.0.1:3000/ >/dev/null
 
 if [[ "${DOMAIN}" != "_" && -n "${EMAIL}" ]]; then
   if ! command -v certbot >/dev/null 2>&1; then
@@ -183,5 +138,5 @@ for stale_release in "${STALE_RELEASES[@]}"; do
   fi
 done
 
-echo "部署完成：${SITE_URL}"
+echo "部署完成。"
 echo "当前版本：${RELEASE_DIR}"

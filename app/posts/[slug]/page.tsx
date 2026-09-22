@@ -13,6 +13,12 @@ import { SITE_URL } from '@/lib/site';
 
 type PageProps = { params: Promise<{ slug: string }> };
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return posts.map((post) => ({ slug: post.slug }));
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = getPostBySlug(slug);

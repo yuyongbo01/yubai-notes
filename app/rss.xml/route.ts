@@ -1,6 +1,8 @@
 import { posts } from '@/lib/demo-content';
 import { SITE_URL } from '@/lib/site';
 
+export const dynamic = 'force-static';
+
 export function GET() {
   const items = posts
     .map((post) => `<item><title><![CDATA[${post.title}]]></title><link>${SITE_URL}/posts/${post.slug}</link><guid>${SITE_URL}/posts/${post.slug}</guid><pubDate>${new Date(post.date).toUTCString()}</pubDate><description><![CDATA[${post.excerpt}]]></description></item>`)

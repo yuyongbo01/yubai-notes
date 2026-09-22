@@ -1,4 +1,4 @@
-name: Build runtime release
+name: Build static release
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: runtime-release
+  group: static-release
   cancel-in-progress: true
 
 jobs:
@@ -29,51 +29,46 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Build application
+      - name: Build static site
         run: npm run build
         env:
-          SITE_URL: http://localhost:3000
+          SITE_URL: ${{ vars.SITE_URL || 'http://47.117.190.250' }}
 
-      - name: Keep runtime dependencies only
-        run: npm prune --omit=dev --no-audit --no-fund
-
-      - name: Smoke test production bundle
+      - name: Smoke test static output
         shell: bash
         run: |
-          SITE_URL=http://127.0.0.1:3000 npm start >/tmp/yubai-notes.log 2>&1 &
-          app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-          for attempt in {1..30}; do
-            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+          test -f dist/client/index.html
+          python3 -m http.server 3000 --directory dist/client >/tmp/yubai-static.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null && \
+               curl -fsS http://127.0.0.1:3000/about.html >/dev/null && \
+               curl -fsS http://127.0.0.1:3000/posts.html >/dev/null && \
+               curl -fsS http://127.0.0.1:3000/posts/notes-are-a-conversation.html >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          cat /tmp/yubai-notes.log
+          cat /tmp/yubai-static.log
           exit 1
 
-      - name: Package runtime bundle
+      - name: Package static site
         shell: bash
         run: |
-          tar -czf yubai-notes-linux-x64.tar.gz \
-            dist node_modules package.json package-lock.json .openai \
-            app components hooks lib public components.json \
-            next.config.ts tsconfig.json vite.config.ts
-          sha256sum yubai-notes-linux-x64.tar.gz > SHA256SUMS
+          tar -C dist/client -czf /tmp/yubai-notes-static.tar.gz .
+          cd /tmp
+          sha256sum yubai-notes-static.tar.gz > SHA256SUMS
 
-      - name: Publish rolling release
+      - name: Publish lightweight static branch
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          git tag --force runtime-latest "$GITHUB_SHA"
-          git push origin refs/tags/runtime-latest --force
-          if gh release view runtime-latest >/dev/null 2>&1; then
-            gh release upload runtime-latest \
-              yubai-notes-linux-x64.tar.gz SHA256SUMS --clobber
-          else
-            gh release create runtime-latest \
-              yubai-notes-linux-x64.tar.gz SHA256SUMS \
-              --title "Latest runtime bundle" \
-              --notes "Automatically built deployment bundle for Ubuntu/Debian servers."
-          fi
+          mkdir /tmp/runtime-static
+          cp /tmp/yubai-notes-static.tar.gz /tmp/SHA256SUMS /tmp/runtime-static/
+          git switch --orphan runtime-static
+          git rm -rf .
+          cp /tmp/runtime-static/* .
+          git add SHA256SUMS yubai-notes-static.tar.gz
+          git -c user.name=github-actions -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+            commit -m "Publish static deployment bundle"
+          git push origin HEAD:runtime-static --force
